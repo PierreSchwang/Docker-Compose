@@ -1,0 +1,15 @@
+version: '3'
+services:
+  portainer:
+    container_name: Portainer
+    image: portainer/portainer-ce
+    restart: always
+    volumes:
+      - '/var/run/docker.sock:/var/run/docker.sock'
+      - 'portainer_data:/data'
+    ports:
+#     - 127.0.0.1:8000:8000   => You only need to expose the port 8000 if you plan to use the EDGE agent
+      - 127.0.0.1:9111:9000
+
+volumes:
+  portainer_data:
