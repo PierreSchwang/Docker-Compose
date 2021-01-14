@@ -1,0 +1,98 @@
+version: '3.8'
+
+services:
+
+  panel:
+    image: ccarney16/pterodactyl-panel:${PANEL_VERSION}
+    restart: always
+    networks:
+      local:
+      pterodactyl:
+      database:
+      redis:
+      web:
+    env_file:
+      - .env
+    volumes:
+      - ${DATA_DIR}/panel:/data
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.pterodactyl-panel.entrypoints=web"
+      - "traefik.http.routers.pterodactyl-panel.rule=Host(`${PANEL_DOMAIN}`)"
+      - "traefik.http.middlewares.pterodactyl-panel-https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.routers.pterodactyl-panel.middlewares=pterodactyl-panel-https-redirect"
+      - "traefik.http.routers.pterodactyl-panel-secure.entrypoints=websecure"
+      - "traefik.http.routers.pterodactyl-panel-secure.rule=Host(`${PANEL_DOMAIN}`)"
+      - "traefik.http.routers.pterodactyl-panel-secure.tls=true"
+      - "traefik.http.routers.pterodactyl-panel-secure.tls.certresolver=cloudflare"
+      - "traefik.http.routers.pterodactyl-panel-secure.service=pterodactyl-panel"
+      - "traefik.http.services.pterodactyl-panel.loadbalancer.server.port=80"
+      - "traefik.docker.network=web"
+
+  worker:
+    image: ccarney16/pterodactyl-panel:${PANEL_VERSION}
+    restart: always
+    command: p:worker
+    env_file:
+      - .env
+    networks:
+      local:
+      database:
+      redis:
+    volumes:
+      - ${DATA_DIR}/panel:/data
+
+  cron:
+    image: ccarney16/pterodactyl-panel:${PANEL_VERSION}
+    restart: always
+    command: p:cron
+    env_file:
+      - .env
+    networks:
+      local:
+      database:
+      redis:
+    volumes:
+      - ${DATA_DIR}/panel:/data
+
+  daemon:
+    image: ccarney16/pterodactyl-daemon:${DAEMON_VERSION}
+    ports:
+      - 2022:2022
+    networks:
+      pterodactyl:
+      web:
+    privileged: true
+    env_file:
+      - .env
+    restart: always
+    working_dir: ${DATA_DIR_DAEMON}
+    environment:
+      - TZ=${DAEMON_TIMEZONE:-CET}
+    volumes:
+      - ${DATA_DIR_DAEMON}:${DATA_DIR_DAEMON}
+      - ${DATA_DIR}/daemon/config:/etc/pterodactyl
+      - /tmp/pterodactyl:/tmp/pterodactyl
+      - ${DAEMON_DOCKER_ROOT:-/var/lib/docker}:${DAEMON_DOCKER_ROOT:-/var/lib/docker}
+      - ${DAEMON_DOCKER_SOCKET:-/var/run/docker.sock}:${DAEMON_DOCKER_SOCKET:-/var/run/docker.sock}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.pterodactyl-daemon.rule=Host(`${DAEMON_DOMAIN}`)"
+      - "traefik.http.routers.pterodactyl-daemon.tls=true"
+      - "traefik.http.services.pterodactyl-daemon.loadbalancer.server.port=443"
+      - "traefik.docker.network=web"
+
+      
+networks:
+  local:
+    external: false
+  pterodactyl:
+    external: false
+  redis:
+    external:
+      name: redis
+  database:
+    external:
+      name: database
+  web:
+    external: true
